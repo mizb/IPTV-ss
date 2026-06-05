@@ -625,15 +625,19 @@ def classify_channel(name, group):
        'kids' in g or 'animation' in g:
         return '国际 · 儿童'
 
-    # ── 过滤掉不需要的内容 ────────────────────────────────────────────────
-    if re.search(r'church|bible|god|jesus|christian|muslim|prayer|宗教|佛教|religious', n) or \
+    # ── 宗教 ──────────────────────────────────────────────────────────────
+    if re.search(r'church|bible|god|jesus|christ|muslim|prayer|worship|宗教|佛教', n) or \
        'religious' in g:
-        return None   # 返回 None 表示过滤掉
-    if 'shop' in g or re.search(r'shop|shopping|teleshopping', n):
-        return None
-    if 'legislative' in g:
-        return None
+        return '宗教'
 
+    # ── 购物 ──────────────────────────────────────────────────────────────
+    if 'shop' in g or re.search(r'\bshop\b|shopping|teleshopping', n):
+        return '购物'
+
+    # ── 议会与立法 ────────────────────────────────────────────────────────
+    if 'legislative' in g:
+        return '议会与立法'
+        
     return '国际 · 综合'
 
 def sort_channels_by_category(channels, config):
