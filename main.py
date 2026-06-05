@@ -362,19 +362,307 @@ def organize_channels(sources_data, config):
     logger.info(f"频道整理完成，共 {len(channels_by_name)} 个唯一频道")
     return channels_by_name
 
+# 省份关键词映射表
+PROVINCE_KEYWORDS = {
+    "北京":  ["北京"],
+    "上海":  ["上海"],
+    "天津":  ["天津"],
+    "重庆":  ["重庆", "渝"],
+    "广东":  ["广东", "广州", "深圳", "东莞", "佛山", "珠海", "汕头", "湛江", "中山", "惠州",
+              "江门", "肇庆", "茂名", "韶关", "梅州", "潮州", "揭阳", "清远", "阳江", "云浮",
+              "河源", "汕尾"],
+    "浙江":  ["浙江", "杭州", "宁波", "温州", "嘉兴", "湖州", "绍兴", "金华", "衢州",
+              "舟山", "台州", "丽水", "余姚", "慈溪", "义乌", "诸暨", "瑞安", "乐清",
+              "缙云", "新昌", "兰溪", "象山", "武义", "永嘉", "苍南", "平湖", "海宁",
+              "上虞", "萧山", "余杭", "衢江", "开化", "云和", "庆元", "龙泉", "龙游",
+              "普陀", "武义", "兰溪"],
+    "江苏":  ["江苏", "南京", "苏州", "无锡", "常州", "南通", "镇江", "扬州", "淮安",
+              "连云港", "盐城", "宿迁", "泰州", "徐州", "新沂", "武进", "溧水", "靖江",
+              "泰州"],
+    "湖南":  ["湖南", "长沙", "株洲", "湘潭", "衡阳", "邵阳", "岳阳", "常德", "张家界",
+              "益阳", "郴州", "永州", "怀化", "娄底", "湘西"],
+    "湖北":  ["湖北", "武汉", "黄石", "十堰", "荆州", "荆门", "宜昌", "鄂州", "孝感",
+              "黄冈", "咸宁", "随州", "恩施", "仙桃", "潜江", "天门", "神农架",
+              "江夏", "荆门"],
+    "四川":  ["四川", "成都", "绵阳", "德阳", "广元", "遂宁", "内江", "乐山", "南充",
+              "眉山", "宜宾", "广安", "达州", "雅安", "巴中", "资阳", "阿坝", "甘孜",
+              "凉山", "叙州", "蓬安", "旺苍", "南部", "松潘", "黑水", "汶川", "泸州",
+              "广安", "雅安"],
+    "山东":  ["山东", "济南", "青岛", "淄博", "枣庄", "东营", "烟台", "潍坊", "济宁",
+              "泰安", "威海", "日照", "莱芜", "临沂", "德州", "聊城", "滨州", "菏泽"],
+    "河南":  ["河南", "郑州", "开封", "洛阳", "平顶山", "安阳", "鹤壁", "新乡", "焦作",
+              "濮阳", "许昌", "漯河", "三门峡", "南阳", "商丘", "信阳", "周口", "驻马店",
+              "沁阳", "泌阳", "郸城"],
+    "河北":  ["河北", "石家庄", "唐山", "秦皇岛", "邯郸", "邢台", "保定", "张家口",
+              "承德", "沧州", "廊坊", "衡水", "双滦", "涉县", "涞水", "清苑", "青县",
+              "滦平"],
+    "山西":  ["山西", "太原", "大同", "朔州", "忻州", "阳泉", "长治", "晋城", "晋中",
+              "运城", "临汾", "吕梁", "太谷", "武乡"],
+    "陕西":  ["陕西", "西安", "铜川", "宝鸡", "咸阳", "渭南", "延安", "汉中", "榆林",
+              "安康", "商洛"],
+    "辽宁":  ["辽宁", "沈阳", "大连", "鞍山", "抚顺", "本溪", "丹东", "锦州", "营口",
+              "阜新", "辽阳", "盘锦", "铁岭", "朝阳", "葫芦岛"],
+    "吉林":  ["吉林", "长春", "四平", "辽源", "通化", "松原", "白城", "延边", "白山",
+              "农安", "舒兰", "辉南", "珲春"],
+    "黑龙江": ["黑龙江", "哈尔滨", "齐齐哈尔", "牡丹江", "佳木斯", "大庆", "鸡西",
+               "鹤岗", "双鸭山", "伊春", "七台河", "黑河", "绥化", "大兴安岭"],
+    "安徽":  ["安徽", "合肥", "芜湖", "蚌埠", "淮南", "马鞍山", "淮北", "铜陵", "安庆",
+              "黄山", "滁州", "阜阳", "宿州", "巢湖", "六安", "亳州", "池州", "宣城",
+              "固镇"],
+    "福建":  ["福建", "福州", "厦门", "莆田", "三明", "泉州", "漳州", "南平", "龙岩",
+              "宁德"],
+    "江西":  ["江西", "南昌", "景德镇", "萍乡", "九江", "新余", "鹰潭", "赣州", "吉安",
+              "宜春", "抚州", "上饶"],
+    "广西":  ["广西", "南宁", "柳州", "桂林", "梧州", "北海", "防城港", "钦州", "贵港",
+              "玉林", "百色", "贺州", "河池", "来宾", "崇左", "灌阳"],
+    "云南":  ["云南", "昆明", "曲靖", "玉溪", "保山", "昭通", "丽江", "普洱", "临沧",
+              "楚雄", "红河", "文山", "西双版纳", "大理", "德宏", "怒江", "迪庆"],
+    "贵州":  ["贵州", "贵阳", "六盘水", "遵义", "安顺", "毕节", "铜仁", "黔西南",
+              "黔东南", "黔南"],
+    "甘肃":  ["甘肃", "兰州", "嘉峪关", "金昌", "白银", "天水", "武威", "张掖", "平凉",
+              "酒泉", "庆阳", "定西", "陇南", "临夏", "甘南"],
+    "新疆":  ["新疆", "乌鲁木齐", "克拉玛依", "吐鲁番", "哈密", "和田", "阿克苏",
+              "喀什", "伊犁", "塔城", "阿勒泰", "博尔塔拉", "昌吉", "巴音郭楞",
+              "克孜勒苏", "兵团"],
+    "西藏":  ["西藏", "拉萨", "昌都", "山南", "日喀则", "那曲", "阿里", "林芝"],
+    "青海":  ["青海", "西宁", "海东", "海北", "黄南", "海南", "果洛", "玉树", "海西"],
+    "宁夏":  ["宁夏", "银川", "石嘴山", "吴忠", "固原", "中卫"],
+    "内蒙古": ["内蒙古", "呼和浩特", "包头", "乌海", "赤峰", "通辽", "鄂尔多斯",
+               "呼伦贝尔", "巴彦淖尔", "乌兰察布", "兴安", "锡林郭勒", "阿拉善"],
+    "海南":  ["海南", "海口", "三亚", "三沙", "儋州"],
+}
+
+
+def classify_channel(name, group):
+    """
+    根据频道名和原始 group-title 判断新分类
+    返回新的 group-title 字符串
+    """
+    n = name.lower()
+    g = group.lower() if group else ""
+
+    # ── 中国大陆 · 央视 ────────────────────────────────────────────────────
+    is_cctv = re.search(r'cctv|央视|中央电视|cgtn', n) or \
+              group in ['央视', '央视频道', '📺央视频道']
+    if is_cctv:
+        if re.search(r'体育|sport|golf|tennis|football|billiard', n):
+            return '中国大陆 · 体育'
+        if re.search(r'纪录|documentary|地理|nature', n):
+            return '中国大陆 · 纪录'
+        if re.search(r'新闻|news', n):
+            return '中国大陆 · 新闻'
+        if re.search(r'电影|movie|film|剧场', n):
+            return '中国大陆 · 影视'
+        if re.search(r'少儿|儿童|动画|kids', n):
+            return '中国大陆 · 儿童'
+        return '中国大陆 · 央视'
+
+    # ── 中国大陆 · 卫视 ────────────────────────────────────────────────────
+    weishi_names = ['湖南卫视','浙江卫视','江苏卫视','东方卫视','北京卫视','深圳卫视',
+                    '广东卫视','安徽卫视','山东卫视','四川卫视','重庆卫视','辽宁卫视',
+                    '黑龙江卫视','吉林卫视','河南卫视','湖北卫视','河北卫视','山西卫视',
+                    '贵州卫视','云南卫视','广西卫视','新疆卫视','西藏卫视','宁夏卫视',
+                    '内蒙古卫视','青海卫视','甘肃卫视','陕西卫视','江西卫视','福建卫视',
+                    '海南卫视','天津卫视','上海卫视','大湾区卫视','兵团卫视',
+                    '星空卫视','凤凰卫视','香港卫视','人间卫视','安多卫视']
+    if any(w in name for w in weishi_names) or group in ['卫视频道', '📡卫视频道']:
+        if re.search(r'新闻|news', n):
+            return '中国大陆 · 新闻'
+        if re.search(r'体育|sport', n):
+            return '中国大陆 · 体育'
+        return '中国大陆 · 卫视'
+
+    # ── 香港 ───────────────────────────────────────────────────────────────
+    hk_keywords = ['翡翠台','明珠台','tvb','凤凰中文','凤凰资讯','凤凰卫视',
+                   'now tv','viutv','有线新闻','有线财经','有线娱乐','大湾区']
+    if any(k.lower() in n for k in hk_keywords):
+        if re.search(r'新闻|news|资讯', n): return '香港 · 新闻'
+        if re.search(r'体育|sport', n):     return '香港 · 体育'
+        if re.search(r'纪录|documentary', n): return '香港 · 纪录'
+        if re.search(r'影视|电影|剧', n):   return '香港 · 影视'
+        return '香港 · 综合'
+
+    # ── 台湾 ───────────────────────────────────────────────────────────────
+    tw_keywords = ['台视','民视','三立','tvbs','中天','东森','华视','中视','公视',
+                   '大爱','年代','纬来','八大','客家','原住民','大立电视','唯心']
+    if any(k.lower() in n for k in tw_keywords):
+        if re.search(r'新闻|news', n):      return '台湾 · 新闻'
+        if re.search(r'体育|sport', n):     return '台湾 · 体育'
+        if re.search(r'纪录|documentary', n): return '台湾 · 纪录'
+        if re.search(r'影视|电影|剧|戏剧', n): return '台湾 · 影视'
+        return '台湾 · 综合'
+
+    # ── 中国大陆地方台（按省份）──────────────────────────────────────────
+    cn_local_groups = ['地方','地方频道','直播中国',
+                       '☘️吉林频道','☘️四川频道','☘️安徽频道','☘️山东频道',
+                       '☘️山西频道','☘️广东频道','☘️广西频道','☘️江苏频道',
+                       '☘️河北频道','☘️河南频道','☘️浙江频道','☘️海南频道',
+                       '☘️湖北频道','☘️福建频道','☘️辽宁频道','☘️陕西频道',
+                       '☘️青海频道','☘️黑龙江频道',
+                       '吉林','四川','安徽','山西','内蒙古','新疆','甘肃',
+                       '西藏','重庆','江苏','江西','河北','浙江','湖北']
+    
+    # 先判断是不是地方台（group 在列表里，或者频道名包含中文地名）
+    is_cn_local = group in cn_local_groups
+    if not is_cn_local:
+        # 通过省份关键词判断
+        for province, keywords in PROVINCE_KEYWORDS.items():
+            if any(kw in name for kw in keywords):
+                is_cn_local = True
+                break
+
+    if is_cn_local:
+        # 先判断内容类型
+        content_type = None
+        if re.search(r'体育|sport|足球|篮球|劲爆', n):
+            content_type = '体育'
+        elif re.search(r'新闻|资讯|法治', n):
+            content_type = '新闻'
+        elif re.search(r'纪录|科教|人文|纪实', n):
+            content_type = '纪录'
+        elif re.search(r'影视|电影|电视剧|剧场', n):
+            content_type = '影视'
+        elif re.search(r'少儿|儿童|动画|动漫', n):
+            content_type = '儿童'
+
+        # 如果是央视/卫视体育或新闻，已在前面处理，这里不会到
+        if content_type in ('体育',):
+            return '中国大陆 · 体育'
+        if content_type in ('新闻',):
+            return '中国大陆 · 新闻'
+        if content_type in ('纪录',):
+            return '中国大陆 · 纪录'
+        if content_type in ('影视',):
+            return '中国大陆 · 影视'
+        if content_type in ('儿童',):
+            return '中国大陆 · 儿童'
+
+        # 判断省份
+        for province, keywords in PROVINCE_KEYWORDS.items():
+            if any(kw in name for kw in keywords):
+                return province
+        # group 名称直接是省份
+        for province in PROVINCE_KEYWORDS:
+            if province in group:
+                return province
+        return '中国大陆 · 地方频道'
+
+    # ── 美国 ───────────────────────────────────────────────────────────────
+    us_news = ['abc news','cbs news','nbc news','fox news','cnn','msnbc',
+               'newsmax','newsnation','one america','c-span','pbs newshour']
+    us_sports = ['espn','nfl','nba tv','mlb network','nhl network',
+                 'fox sports','nbc sports','cbs sports','golf channel',
+                 'tennis channel','fubo sports']
+    if any(k in n for k in us_news) or \
+       re.search(r'(abc|cbs|nbc|fox)\s+news', n):
+        return '美国 · 新闻'
+    if any(k in n for k in us_sports):
+        return '美国 · 体育'
+    if re.search(r'\b(abc|cbs|nbc|fox|pbs)\s+\d', name) or \
+       re.search(r'\b(WKRN|WSMV|WNBC|KABC|KTTV|WLS|WXYZ|KHOU|KPRC|KSAT|WFAA)\b', name):
+        return '美国 · 综合'
+
+    # ── 英国 ───────────────────────────────────────────────────────────────
+    uk_keywords = ['bbc','itv','channel 4','channel 5','sky news',
+                   'gb news','talk tv','times radio']
+    if any(k in n for k in uk_keywords):
+        if re.search(r'news|新闻', n):      return '英国 · 新闻'
+        if re.search(r'sport|体育', n):     return '英国 · 体育'
+        if re.search(r'drama|film|comedy', n): return '英国 · 影视'
+        return '英国 · 综合'
+
+    # ── 加拿大 ─────────────────────────────────────────────────────────────
+    if re.search(r'\b(cbc|ctv|global tv|tsn|sportsnet|cpac)\b', n):
+        if re.search(r'news|新闻', n): return '加拿大 · 新闻'
+        return '加拿大 · 综合'
+
+    # ── 澳大利亚 ───────────────────────────────────────────────────────────
+    if re.search(r'\b(abc.*au|sbs|nine|seven|ten|foxtel)\b', n) or \
+       re.search(r'australia', n):
+        return '澳大利亚 · 综合'
+
+    # ── 日本 ───────────────────────────────────────────────────────────────
+    if group in ['•日本'] or re.search(r'nhk|fuji tv|tbs japan|tv tokyo', n):
+        if re.search(r'news|新闻|world', n): return '日本 · 新闻'
+        return '日本 · 综合'
+
+    # ── 韩国 ───────────────────────────────────────────────────────────────
+    if group in ['•韩国'] or re.search(r'kbs|mbc|sbs|jtbc|arirang', n):
+        if re.search(r'news|新闻', n): return '韩国 · 新闻'
+        return '韩国 · 综合'
+
+    # ── 俄罗斯 ─────────────────────────────────────────────────────────────
+    if re.search(r'rt news|russia today|первый|нтв|звезда', n):
+        if re.search(r'news|новости', n): return '俄罗斯 · 新闻'
+        return '俄罗斯 · 综合'
+
+    # ── 法国/德国/土耳其 ───────────────────────────────────────────────────
+    if re.search(r'france 24|france info|bfm|lci', n): return '法国 · 新闻'
+    if re.search(r'\bdw\b|deutsche welle', n):          return '德国 · 新闻'
+    if re.search(r'\btrt\b', n):                        return '土耳其 · 新闻'
+
+    # ── 中东 ───────────────────────────────────────────────────────────────
+    if re.search(r'al jazeera|al arabiya|al mayadeen|sky news arabia|'
+                 r'al iraqia|asharq|al manar', n):
+        return '中东 · 新闻'
+
+    # ── 音乐 MV ────────────────────────────────────────────────────────────
+    if group in ['•MTV', 'Music', '音乐频道', '•音乐'] or \
+       re.search(r'mtv|music|音乐|mv', n):
+        return '音乐 · MV'
+
+    # ── 全球内容分类 ───────────────────────────────────────────────────────
+    if re.search(r'news|新闻|noticias|nachrichten|actualit', n) or \
+       'news' in g:
+        return '国际 · 新闻'
+    if re.search(r'sport|体育|deporte|calcio|football|soccer|tennis|golf', n) or \
+       'sport' in g:
+        return '国际 · 体育'
+    if re.search(r'documentary|纪录|national geographic|discovery|history', n) or \
+       'documentary' in g:
+        return '国际 · 纪录'
+    if re.search(r'kids|children|少儿|儿童|cartoon|animation|junior', n) or \
+       'kids' in g or 'animation' in g:
+        return '国际 · 儿童'
+
+    # ── 过滤掉不需要的内容 ────────────────────────────────────────────────
+    if re.search(r'church|bible|god|jesus|christian|muslim|prayer|宗教|佛教|religious', n) or \
+       'religious' in g:
+        return None   # 返回 None 表示过滤掉
+    if 'shop' in g or re.search(r'shop|shopping|teleshopping', n):
+        return None
+    if 'legislative' in g:
+        return None
+
+    return '国际 · 综合'
+
 def sort_channels_by_category(channels, config):
-    """按分类对频道进行排序"""
-    # 定义分类顺序
+    """先分类再排序"""
     category_order = {cat: idx for idx, cat in enumerate(config.get("categories", []))}
     default_order = len(category_order)
-    
-    def get_category_order(channel_data):
-        channel_name, data = channel_data
+
+    # 先给每个频道设置正确的 group-title
+    filtered = {}
+    for channel_name, data in channels.items():
         info = data["info"]
-        group = info.get("group-title", "其他")
+        name = info.get('title', channel_name)
+        old_group = info.get('group-title', '')
+        
+        new_group = classify_channel(name, old_group)
+        
+        if new_group is None:   # 被过滤掉
+            continue
+        
+        info['group-title'] = new_group
+        filtered[channel_name] = data
+
+    # 再排序
+    def get_order(item):
+        _, data = item
+        group = data["info"].get("group-title", "其他")
         return category_order.get(group, default_order)
-    
-    return sorted(channels.items(), key=get_category_order)
+
+    return sorted(filtered.items(), key=get_order)
 
 def generate_m3u(sorted_channels, output_path):
     """生成M3U文件，包含主源和备用源"""
