@@ -112,6 +112,10 @@ class IPTVSourceChecker:
                     is_valid = has_video
                     
                     if is_valid:
+                        # 进一步检测是否为静态画面（图片+音频）
+                        if self._is_static_stream(url):
+                            logger.debug(f"静态画面源，跳过: {url}")
+                            return False, float('inf')
                         logger.debug(f"有效源: {url}, 延迟: {latency:.2f}秒")
                         return True, latency
                     else:
@@ -131,3 +135,32 @@ class IPTVSourceChecker:
         except Exception as e:
             logger.debug(f"检查出错: {url}, 错误: {str(e)}")
             return False, float('inf')
+
+    def _is_static_stream(self, url):
+        """
+        检测是否为静态画面（图片+音频，无实际视频变化）
+        取6秒视频，若画面冻结超过4秒则判定为静态
+        """
+        try:
+            cmd = [
+                'ffmpeg',
+                '-i', url,
+                '-t', '6',
+                '-vf', 'freezedetect=n=0.001:d=4',
+                '-an',
+                '-f', 'null',
+                '-'
+            ]
+            result = subprocess.run(
+                cmd,
+                capture_output=True,
+                timeout=20,
+                text=True
+            )
+            return 'freeze_start' in result.stderr
+        except subprocess.TimeoutExpired:
+            logger.debug(f"静态检测超时: {url}")
+            return False
+        except Exception as e:
+            logger.debug(f"静态检测出错: {url}, 错误: {str(e)}")
+            return False
