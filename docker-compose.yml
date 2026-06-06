@@ -1,0 +1,10 @@
+services:
+  iptv-sources:
+    build: .
+    container_name: iptv-sources
+    volumes:
+      - ./data:/app/data
+      - ./config.json:/app/config.json
+    environment:
+      - TZ=Asia/Shanghai
+    restart: "no"
