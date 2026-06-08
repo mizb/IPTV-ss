@@ -1,6 +1,6 @@
 services:
   iptv-sources:
-    build: .
+    image: cs3306/iptv-sources:latest
     container_name: iptv-sources
     volumes:
       - ./data:/app/data

@@ -1,75 +1,114 @@
 # IPTV-Sources
 
-这是一个自动收集、检测和合并 IPTV 直播源的项目，支持为每个频道提供多个直播源，当主源失效时可自动切换到备用源。  
-项目通过 GitHub Actions 自动运行，每 6 小时更新一次。
+自动收集、检测和整理 IPTV 直播源，支持多源备份、自动分类、静态画面过滤。
+
+## 直播源订阅地址
+
+```
+https://raw.githubusercontent.com/cs3306/IPTV-Sources/main/data/output/iptv_collection.m3u
+```
+
+支持所有标准 M3U 播放器，包括 APTV、Tivimate、OTT Navigator、VLC 等。
 
 ## 特点
 
-- 🔄 **自动收集**：从多个来源自动收集 IPTV 直播源
-- 🛠️ **自动检测**：定期检测直播源有效性和性能
-- 🔍 **去重合并**：对相同频道的不同源进行去重和合并
-- 📺 **多源备份**：每个频道保留多个备选源，主源失效时自动切换
-- 📋 **分类整理**：频道按类别整理，方便查找
-- ⏱️ **定时更新**：通过 GitHub Actions 每 6 小时自动更新一次
+- 自动从 40+ 个公开直播源收集频道
+- ffprobe 检测无效源，freezedetect 过滤静态画面频道
+- 同一频道保留最多两个源，主源失效时自动切换
+- 按地区+内容类型双维度分类（央视 / 卫视 / 各省地方台 / 港台 / 美英日韩等）
+- 域名黑名单过滤低质量中转源
+- 每天凌晨 3 点自动更新
 
-## 直播源地址
+## 分类体系
 
-您可以直接使用以下地址作为您的 IPTV 播放源：
+| 分类 | 说明 |
+|------|------|
+| 中国大陆 · 央视 / 卫视 | CCTV 及各省卫视 |
+| 北京 / 上海 / 广东 … | 34个省级行政区地方台 |
+| 中国大陆 · 地方频道 | 无法识别省份的地方台 |
+| 香港 · 新闻 / 综合 | TVB、凤凰等 |
+| 台湾 · 新闻 / 综合 | 三立、TVBS、民视等 |
+| 美国 · 新闻 / 体育 / 综合 | CNN、ESPN 等 |
+| 英国 / 加拿大 / 日本 / 韩国 … | 各国主流频道 |
+| 国际 · 新闻 / 体育 / 纪录 / 儿童 | 其余全球频道 |
+| 音乐 · MV | 音乐视频频道 |
+| 宗教 / 购物 / 议会与立法 | 单独分类 |
 
-- [https://raw.githubusercontent.com/cs3306/IPTV-Sources/main/data/output/iptv_collection.m3u](https://raw.githubusercontent.com/cs3306/IPTV-Sources/main/data/output/iptv_collection.m3u)  
+## 部署方式
 
-## 播放器支持
+### 方式一：Docker 本地部署（推荐）
 
-本项目生成的直播源为标准 M3U 格式，绝大多数支持 M3U 播放列表的 IPTV 播放器均可直接使用。
+适合有自己服务器的用户，无运行时间限制，可自定义更新频率。
 
-只需在播放器中导入上述 URL，即可播放频道。
+**前置要求：** Docker、Docker Compose、ffmpeg（容器内已包含）
 
-## 项目原理
+```bash
+git clone https://github.com/cs3306/IPTV-Sources.git
+cd IPTV-Sources
+docker compose up -d
+```
 
-本项目的工作流程如下：
+或者直接拉取镜像运行：
 
-- **收集阶段**：从多个预设的资源库和网站收集 M3U 格式的直播源
-- **检测阶段**：检测每个直播源的可用性和性能表现
-- **去重合并阶段**：对同一频道的多个源进行整合，并按性能排序
-- **生成阶段**：生成支持多源切换的 M3U 文件，并按分类整理
-- **更新阶段**：通过 GitHub Actions 自动定期执行以上流程
+```bash
+docker run --rm \
+  -v $(pwd)/data:/app/data \
+  -v $(pwd)/config.json:/app/config.json \
+  cs3306/iptv-sources:latest
+```
+
+设置定时任务（每天凌晨 3 点更新并推送到 GitHub）：
+
+```bash
+chmod +x run_and_push.sh
+crontab -e
+# 加入以下行：
+0 3 * * * /path/to/IPTV-Sources/run_and_push.sh >> /path/to/run.log 2>&1
+```
+
+### 方式二：GitHub Actions 自动部署
+
+适合没有自己服务器的用户，Fork 本项目后自动运行。
+
+1. Fork 本仓库
+2. 进入仓库 **Settings → Actions → General**，将 Workflow permissions 设为 **Read and write permissions**
+3. 进入 **Actions → Update IPTV Sources**，点击 **Run workflow** 手动触发一次
+4. 之后每天凌晨 3 点（UTC）自动运行
+
+> **注意：** GitHub Actions 免费版每月有 2000 分钟额度限制，每次运行约需 2-4 小时（取决于源数量），建议仅在资源充足时使用此方式。
+
+## 自定义配置
+
+编辑 `config.json`：
+
+```json
+{
+  "sources": [...],          // 直播源地址列表
+  "excluded_sources": [...], // 域名黑名单，包含这些域名的流地址会被过滤
+  "check_timeout": 5,        // 单个源检测超时（秒）
+  "max_workers": 10,         // 并发检测线程数
+  "channel_name_map": {...}  // 频道名称标准化映射
+}
+```
+
+## Docker 镜像
+
+```
+docker pull cs3306/iptv-sources:latest
+```
+
+每次代码更新后 GitHub Actions 自动构建新镜像并推送到 Docker Hub。
 
 ## 致谢
 
-感谢以下项目和资源提供的直播源支持：
+感谢以下项目提供的直播源：
 
-- [iptv-org/iptv](https://github.com/iptv-org/iptv)
-- [YanG-1989/m3u](https://github.com/YanG-1989/m3u)
-- [tv.iill.top](https://tv.iill.top)
-- [live.zbds.top](https://live.zbds.top)
-- [live.fanmingming.com](https://live.fanmingming.com)
-- [MercuryZz/IPTVN](https://github.com/MercuryZz/IPTVN)
-- [Moexin/IPTV](https://github.com/Moexin/IPTV)
-- [gnodgl/IPTV](https://github.com/gnodgl/IPTV)
-- [lalifeier/IPTV](https://github.com/lalifeier/IPTV)
-- [cuikaipeng/IPTV](https://github.com/cuikaipeng/IPTV)
-- [vicjl/myIPTV](https://github.com/vicjl/myIPTV)
-- [skddyj/iptv](https://github.com/skddyj/iptv)
-- [fenxp/iptv](https://github.com/fenxp/iptv)
-- [Rivens7/Livelist](https://github.com/Rivens7/Livelist)
-- [Guovin/TV](https://github.com/Guovin/TV)
-- [qwerttvv/Beijing-IPTV](https://github.com/qwerttvv/Beijing-IPTV)
-- [drangjchen/IPTV](https://github.com/drangjchen/IPTV)
-- [YueChan/Live](https://github.com/YueChan/Live)
-- [Ftindy/IPTV-URL](https://github.com/Ftindy/IPTV-URL)
-- [jazzforlove/IPTV](https://github.com/jazzforlove/IPTV)
-- [joevess/IPTV](https://github.com/joevess/IPTV)
-- [GlowsSama/IPTV](https://github.com/GlowsSama/IPTV)
-- [zbefine/iptv](https://github.com/zbefine/iptv)
-- [BigBigGrandG/IPTV-URL](https://github.com/BigBigGrandG/IPTV-URL)
-
-以及所有提供稳定直播源的网站和个人。
+[iptv-org/iptv](https://github.com/iptv-org/iptv) · [YanG-1989/m3u](https://github.com/YanG-1989/m3u) · [Guovin/TV](https://github.com/Guovin/TV) · [Ftindy/IPTV-URL](https://github.com/Ftindy/IPTV-URL) · [wwb521/live](https://github.com/wwb521/live) · [joevess/IPTV](https://github.com/joevess/IPTV) · [zbefine/iptv](https://github.com/zbefine/iptv) · [BigBigGrandG/IPTV-URL](https://github.com/BigBigGrandG/IPTV-URL) 及其他所有贡献者。
 
 ## 免责声明
 
-本项目仅用于学习和技术研究，不存储任何媒体内容。  
-所有内容均来自互联网公开的直播源，请确保您在合法的前提下使用。
+本项目仅用于学习和技术研究，不存储任何媒体内容。所有内容均来自互联网公开直播源，请在合法前提下使用。
 
-## 许可证
+## License
 
-[MIT License](LICENSE)
+[MIT](LICENSE)
