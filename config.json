@@ -1,8 +1,4 @@
 {
-  "excluded_sources": [
-    "freetv.fun",
-    "freetv.top"
-  ],
   "sources": [
     "https://iptv-org.github.io/iptv/index.m3u",
     "https://tv.iill.top/m3u/Gather",
