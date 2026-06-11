@@ -8,3 +8,10 @@ services:
     environment:
       - TZ=Asia/Shanghai
     restart: "no"
+    networks:
+      - misc_shared
+
+networks:
+  misc_shared:
+    external: true
+
